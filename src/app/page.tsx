@@ -55,7 +55,7 @@ export default function Page() {
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([]);
 
   const [placementPrompt, setPlacementPrompt] = useState<string>(
-    "Place the HERO product on the countertop near the sink, realistic size, standing upright. Place the other products nearby without overlapping."
+    ""
   );
 
   const [variants, setVariants] = useState<number>(4);
@@ -158,7 +158,7 @@ export default function Page() {
     });
   }
 
-  function setHero(id: string) {
+  function setMain(id: string) {
     setSelectedProducts((prev) => {
       const idx = prev.findIndex((p) => p.id === id);
       if (idx <= 0) return prev;
@@ -375,14 +375,14 @@ export default function Page() {
                 <div key={p.id} style={{ border: "1px solid #ddd", borderRadius: 10, padding: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
                     <div style={{ fontSize: 12, opacity: 0.85, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {idx === 0 ? "⭐ Hero: " : ""}
+                      {idx === 0 ? "Main: " : ""}
                       {p.kind === "upload" ? p.file.name : `${p.productId}${p.name ? ` – ${p.name}` : ""}`}
                     </div>
 
                     <div style={{ display: "flex", gap: 6 }}>
                       <button onClick={() => moveProduct(p.id, -1)} disabled={idx === 0} title="Flytt opp">↑</button>
                       <button onClick={() => moveProduct(p.id, 1)} disabled={idx === selectedProducts.length - 1} title="Flytt ned">↓</button>
-                      <button onClick={() => setHero(p.id)} disabled={idx === 0} title="Sett som hero">⭐</button>
+                      <button onClick={() => setMain(p.id)} disabled={idx === 0} title="Sett som main">⭐</button>
                       <button onClick={() => removeProduct(p.id)} title="Fjern">X</button>
                     </div>
                   </div>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { generateScene } from "@/lib/ai/azureImageClient";
+import { generateScene } from "@/azure-openai/images";
 import { getTemplateById } from "@/lib/templates/load";
 import { toErrorMessage } from "@/lib/errors";
 

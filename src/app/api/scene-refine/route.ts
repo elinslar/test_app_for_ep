@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { toErrorMessage } from "@/lib/errors";
-import { refineSceneNoMask } from "@/lib/ai/azureImageClient";
+import { refineSceneNoMask } from "@/azure-openai/images";
 
 export const runtime = "nodejs";
 

@@ -5,6 +5,7 @@ import { placeProductsNoMask } from "@/lib/ai/azureImageClient";
 import { toErrorMessage } from "@/lib/errors";
 import { getProductById } from "@/db/actions";
 import { pickBestHref } from "@/lib/productImages";
+import type { ProductRow } from "@/lib/types/product";
 
 export const runtime = "nodejs";
 
@@ -31,9 +32,12 @@ async function downloadUrlToPngBuffer(url: string): Promise<Buffer> {
   return sharp(buf).png().toBuffer();
 }
 
-async function productIdToPngBuffer(productId: string): Promise<{ png: Buffer; href: string }> {
-  const rows = await getProductById(productId);
+async function productIdToPngBuffer(
+  productId: string
+): Promise<{ png: Buffer; href: string }> {
+  const rows = (await getProductById(productId)) as ProductRow[] | null | undefined;
   const p = rows?.[0];
+
   if (!p) throw new Error(`Fant ikke produktId=${productId}`);
 
   const href = pickBestHref(p.images);
@@ -78,7 +82,7 @@ export async function POST(req: Request) {
 
     const sceneBuf = dataUrlToBuffer(sceneDataUrl);
 
-    // Bygg produktlisten i NØYAKTIG rekkefølge (hero først)
+    // Bygg produktlisten i NØYAKTIG rekkefølge (main først)
     const productPngs: Buffer[] = [];
     const usedProductRefs: Array<{ kind: "productId" | "upload"; value: string; href?: string }> = [];
 
@@ -99,7 +103,7 @@ export async function POST(req: Request) {
       "You will receive a scene image (first image) and 1-4 product reference images (next images).",
       "Place the products naturally into the scene according to the user instruction.",
       "Try to keep the original scene composition as unchanged as possible (especially for hard templates).",
-      "The FIRST product reference is the HERO product. Prioritize placing it correctly (scale, perspective, position).",
+      "The FIRST product reference is the main product. Prioritize placing it correctly (scale, perspective, position).",
       "Do NOT change product identity (labels, logos, shape, text).",
       "Use realistic scale and perspective. Add realistic contact shadows.",
       "Do not add new text or watermarks.",
