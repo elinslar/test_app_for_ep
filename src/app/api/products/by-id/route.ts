@@ -1,17 +1,23 @@
 import { NextResponse } from "next/server";
 import { getProductById } from "@/db/actions";
 import { pickBestHref, parseImages } from "@/lib/productImages";
+import type { ProductRow } from "@/lib/types/product";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const productId = url.searchParams.get("productId") ?? "";
-  if (!productId) return NextResponse.json({ error: "productId mangler" }, { status: 400 });
+  if (!productId) {
+    return NextResponse.json({ error: "productId mangler" }, { status: 400 });
+  }
 
-  const rows = await getProductById(productId);
+  const rows = (await getProductById(productId)) as ProductRow[] | null | undefined;
   const p = rows?.[0];
-  if (!p) return NextResponse.json({ found: false });
+
+  if (!p) {
+    return NextResponse.json({ found: false });
+  }
 
   return NextResponse.json({
     found: true,
