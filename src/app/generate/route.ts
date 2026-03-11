@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
 
-import { placeProductsNoMask } from "@/lib/ai/azureImageClient";
+import { placeProductsNoMask } from "@/azure-openai/images";
 import { toErrorMessage } from "@/lib/errors";
 import { getProductById } from "@/db/actions";
 import { pickBestHref } from "@/lib/productImages";
