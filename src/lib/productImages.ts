@@ -2,18 +2,22 @@ import "server-only";
 
 type ProductImage = {
   category?: string;
-  width?: string;
-  height?: string;
+  width?: string | number;
+  height?: string | number;
   href?: string;
 };
 
-const toInt = (s?: string) => {
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
-};
+function toNumber(value: string | number | undefined): number {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 export function parseImages(images: unknown): ProductImage[] {
-  if (Array.isArray(images)) return images as ProductImage[];
+  if (Array.isArray(images)) {
+    return images as ProductImage[];
+  }
+
   if (typeof images === "string") {
     try {
       const parsed = JSON.parse(images);
@@ -22,20 +26,28 @@ export function parseImages(images: unknown): ProductImage[] {
       return [];
     }
   }
+
   return [];
 }
 
 export function pickBestHref(images: unknown): string | null {
-  const arr = parseImages(images).filter((x) => typeof x.href === "string" && x.href.startsWith("http"));
-  if (!arr.length) return null;
+  const candidates = parseImages(images).filter(
+    (image): image is ProductImage & { href: string } =>
+      typeof image.href === "string" && image.href.startsWith("http")
+  );
 
-  const score = (x: ProductImage) => {
-    const isMain = (x.category ?? "").toUpperCase() === "MAIN_IMAGE" ? 1 : 0;
-    const area = toInt(x.width) * toInt(x.height);
-    const vw800 = x.href?.includes("/vw800/") ? 1 : 0;
-    return isMain * 1_000_000_000 + area * 1_000 + vw800 * 10;
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const score = (image: ProductImage): number => {
+    const isMainImage = (image.category ?? "").toUpperCase() === "MAIN_IMAGE" ? 1 : 0;
+    const area = toNumber(image.width) * toNumber(image.height);
+    const hasPreferredVariant = image.href?.includes("/vw800/") ? 1 : 0;
+
+    return isMainImage * 1_000_000_000 + area * 1_000 + hasPreferredVariant * 10;
   };
 
-  arr.sort((a, b) => score(b) - score(a));
-  return arr[0].href ?? null;
+  candidates.sort((a, b) => score(b) - score(a));
+  return candidates[0]?.href ?? null;
 }

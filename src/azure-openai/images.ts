@@ -2,30 +2,35 @@ import "server-only";
 import { toFile } from "openai";
 import { getAzureImageClient } from "./client";
 
-type ImageItem = { b64_json?: string; url?: string };
+type AzureImageItem = {
+  b64_json?: string;
+  url?: string;
+};
 
-async function itemToBuffer(item: ImageItem): Promise<Buffer> {
+async function imageItemToBuffer(item: AzureImageItem): Promise<Buffer> {
   if (item.b64_json) {
     return Buffer.from(item.b64_json, "base64");
   }
 
   if (item.url) {
-    const res = await fetch(item.url);
-    if (!res.ok) {
-      throw new Error(`Failed downloading image url (${res.status})`);
+    const response = await fetch(item.url);
+
+    if (!response.ok) {
+      throw new Error(`Failed downloading Azure image URL (${response.status})`);
     }
-    return Buffer.from(await res.arrayBuffer());
+
+    return Buffer.from(await response.arrayBuffer());
   }
 
   throw new Error("Azure image item missing b64_json/url");
 }
 
-async function dataToBuffers(data: ImageItem[] | undefined): Promise<Buffer[]> {
+async function responseDataToBuffers(data: AzureImageItem[] | undefined): Promise<Buffer[]> {
   if (!data || data.length === 0) {
-    throw new Error("Azure image response: empty data");
+    throw new Error("Azure image response was empty");
   }
 
-  return Promise.all(data.map(itemToBuffer));
+  return Promise.all(data.map(imageItemToBuffer));
 }
 
 export async function generateScene(args: {
@@ -35,7 +40,7 @@ export async function generateScene(args: {
 }): Promise<Buffer> {
   const client = getAzureImageClient();
 
-  const rsp = await client.images.generate({
+  const response = await client.images.generate({
     model: "",
     prompt: args.prompt,
     n: 1,
@@ -43,8 +48,8 @@ export async function generateScene(args: {
     quality: args.quality ?? "high",
   });
 
-  const bufs = await dataToBuffers(rsp.data as ImageItem[] | undefined);
-  return bufs[0];
+  const buffers = await responseDataToBuffers(response.data as AzureImageItem[] | undefined);
+  return buffers[0];
 }
 
 export async function placeProductsNoMask(args: {
@@ -60,12 +65,12 @@ export async function placeProductsNoMask(args: {
 
   const sceneFile = await toFile(args.scenePng, "scene.png", { type: "image/png" });
   const productFiles = await Promise.all(
-    args.productPngs.map((b, i) =>
-      toFile(b, `product_${i + 1}.png`, { type: "image/png" })
+    args.productPngs.map((buffer, index) =>
+      toFile(buffer, `product_${index + 1}.png`, { type: "image/png" })
     )
   );
 
-  const rsp = await client.images.edit({
+  const response = await client.images.edit({
     model: "",
     image: [sceneFile, ...productFiles],
     prompt: args.prompt,
@@ -75,21 +80,20 @@ export async function placeProductsNoMask(args: {
     input_fidelity: args.inputFidelity ?? "high",
   });
 
-  return dataToBuffers(rsp.data as ImageItem[] | undefined);
+  return responseDataToBuffers(response.data as AzureImageItem[] | undefined);
 }
 
 export async function refineSceneNoMask(args: {
   scenePng: Buffer;
   prompt: string;
+  size?: "1024x1024" | "1536x1024" | "1024x1536";
   quality?: "low" | "medium" | "high" | "auto";
   inputFidelity?: "low" | "high";
-  size?: "1024x1024" | "1536x1024" | "1024x1536";
 }): Promise<Buffer> {
   const client = getAzureImageClient();
-
   const sceneFile = await toFile(args.scenePng, "scene.png", { type: "image/png" });
 
-  const rsp = await client.images.edit({
+  const response = await client.images.edit({
     model: "",
     image: [sceneFile],
     prompt: args.prompt,
@@ -99,6 +103,6 @@ export async function refineSceneNoMask(args: {
     input_fidelity: args.inputFidelity ?? "high",
   });
 
-  const bufs = await dataToBuffers(rsp.data as ImageItem[] | undefined);
-  return bufs[0];
+  const buffers = await responseDataToBuffers(response.data as AzureImageItem[] | undefined);
+  return buffers[0];
 }

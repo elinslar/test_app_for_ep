@@ -1,40 +1,42 @@
 import { NextResponse } from "next/server";
+
 import { generateScene } from "@/azure-openai/images";
-import { getTemplateById } from "@/lib/templates/load";
 import { toErrorMessage } from "@/lib/errors";
+import { getTemplateById } from "@/lib/templates/load";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as { templateId?: string };
-    const templateId = body.templateId;
+    const templateId = body.templateId?.trim();
 
     if (!templateId) {
       return NextResponse.json({ error: "templateId mangler" }, { status: 400 });
     }
 
-    const t = await getTemplateById(String(templateId));
-    if (t.type !== "soft") {
+    const template = await getTemplateById(templateId);
+
+    if (template.type !== "soft") {
       return NextResponse.json({ error: "template er ikke soft" }, { status: 400 });
     }
 
-    const buf = await generateScene({
-      prompt: t.scenePrompt,
-      size: t.size ?? "1536x1024",
-      quality: t.quality ?? "high",
+    const buffer = await generateScene({
+      prompt: template.scenePrompt,
+      size: template.size ?? "1536x1024",
+      quality: template.quality ?? "high",
     });
 
-    return new Response(new Uint8Array(buf), {
+    return new Response(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": "image/png",
         "Cache-Control": "no-store",
-        "X-Template-Id": t.id,
+        "X-Template-Id": template.id,
       },
     });
-  } catch (e) {
-    console.error("POST /api/scene failed", e);
-    return NextResponse.json({ error: toErrorMessage(e) }, { status: 500 });
+  } catch (error) {
+    console.error("POST /api/scene failed", error);
+    return NextResponse.json({ error: toErrorMessage(error) }, { status: 500 });
   }
 }

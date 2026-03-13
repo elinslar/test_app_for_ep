@@ -1,38 +1,42 @@
 import { NextResponse } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
-import sharp from "sharp";
 
-import { getTemplateById } from "@/lib/templates/load";
 import { toErrorMessage } from "@/lib/errors";
+import { bufferToPngBuffer } from "@/lib/imageBuffers";
+import { getTemplateById } from "@/lib/templates/load";
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const templateId = url.searchParams.get("templateId") ?? "";
-  if (!templateId) return NextResponse.json({ error: "templateId mangler" }, { status: 400 });
-
   try {
-    const t = await getTemplateById(templateId);
-    if (t.type !== "hard") return NextResponse.json({ error: "template er ikke hard" }, { status: 400 });
+    const url = new URL(req.url);
+    const templateId = url.searchParams.get("templateId")?.trim() ?? "";
 
-    const abs = path.join(process.cwd(), t.baseScene.assetPath);
-    const raw = await fs.readFile(abs);
+    if (!templateId) {
+      return NextResponse.json({ error: "templateId mangler" }, { status: 400 });
+    }
 
-    // gjør alltid om til PNG for sikker preview
-    const png = await sharp(raw).png().toBuffer();
+    const template = await getTemplateById(templateId);
 
-    return new Response(new Uint8Array(png), {
+    if (template.type !== "hard") {
+      return NextResponse.json({ error: "template er ikke hard" }, { status: 400 });
+    }
+
+    const absolutePath = path.join(process.cwd(), template.baseScene.assetPath);
+    const fileBuffer = await fs.readFile(absolutePath);
+    const pngBuffer = await bufferToPngBuffer(fileBuffer);
+
+    return new Response(new Uint8Array(pngBuffer), {
       status: 200,
       headers: {
         "Content-Type": "image/png",
         "Cache-Control": "public, max-age=3600",
-        "X-Template-Id": t.id,
+        "X-Template-Id": template.id,
       },
     });
-  } catch (e) {
-    console.error("GET /api/template-image failed", e);
-    return NextResponse.json({ error: toErrorMessage(e) }, { status: 500 });
+  } catch (error) {
+    console.error("GET /api/template-image failed", error);
+    return NextResponse.json({ error: toErrorMessage(error) }, { status: 500 });
   }
 }
