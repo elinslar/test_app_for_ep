@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { placeProductsNoMask } from "@/azure-openai/images";
 import { toErrorMessage } from "@/lib/errors";
 import { fileToPngBuffer } from "@/lib/imageBuffers";
+import { placeProductsWithModel } from "@/lib/imageGateway";
+import { parseImageModelChoice } from "@/lib/imageModel";
 import { buildPlacementPrompt } from "@/lib/imagePrompts";
 import { parseOrderedRefs } from "@/lib/orderedRefs";
 import { createUploadFileMap, resolveOrderedProducts } from "@/lib/productResolver";
@@ -16,6 +17,7 @@ export async function POST(req: Request) {
     const placementPrompt = String(form.get("placementPrompt") ?? "").trim();
     const variants = Math.max(1, Math.min(Number(form.get("variants") ?? "4"), 8));
     const sceneFile = form.get("scene");
+    const modelChoice = parseImageModelChoice(form.get("modelChoice"));
 
     if (!(sceneFile instanceof File)) {
       return NextResponse.json({ error: "scene (fil) mangler" }, { status: 400 });
@@ -36,12 +38,14 @@ export async function POST(req: Request) {
 
     const scenePng = await fileToPngBuffer(sceneFile);
     const uploadByName = createUploadFileMap(uploadedFiles);
+
     const { productPngs, usedProductRefs } = await resolveOrderedProducts(
       orderedRefs,
       uploadByName
     );
 
-    const resultBuffers = await placeProductsNoMask({
+    const resultBuffers = await placeProductsWithModel({
+      modelChoice,
       scenePng,
       productPngs,
       prompt: buildPlacementPrompt(placementPrompt),
@@ -58,6 +62,7 @@ export async function POST(req: Request) {
       variants: resultDataUrls.length,
       resultDataUrls,
       usedProductRefs,
+      modelChoice,
     });
   } catch (error) {
     console.error("POST /api/generate failed", error);

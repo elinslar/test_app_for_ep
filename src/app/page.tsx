@@ -2,6 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { IMAGE_MODEL_OPTIONS } from "@/lib/imageModel";
+import type { ImageModelChoice } from "@/lib/imageModel";
 import type { OrderedRef } from "@/lib/orderedRefs";
 import type { Template } from "@/lib/templates/types";
 
@@ -12,6 +14,7 @@ type SelectedProduct =
 type GenerateResponse = {
   resultDataUrls?: string[];
   error?: string;
+  modelChoice?: ImageModelChoice;
 };
 
 type ProductLookupResponse = {
@@ -56,6 +59,7 @@ function createUploadProduct(file: File): SelectedProduct {
 export default function Page() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templateId, setTemplateId] = useState("");
+  const [modelChoice, setModelChoice] = useState<ImageModelChoice>("gpt-image-1.5");
 
   const [sceneBlob, setSceneBlob] = useState<Blob | null>(null);
   const [sceneUrl, setSceneUrl] = useState("");
@@ -128,7 +132,7 @@ export default function Page() {
   useEffect(() => {
     async function loadInitialTemplates() {
       try {
-        const response = await fetch("/api/templates");
+        const response = await fetch("/api/templates", { cache: "no-store" });
         if (!response.ok) {
           throw new Error(await readErrorMessage(response));
         }
@@ -148,7 +152,7 @@ export default function Page() {
   }, []);
 
   const loadSceneForTemplate = useCallback(
-    async (nextTemplateId: string) => {
+    async (nextTemplateId: string, nextModelChoice: ImageModelChoice) => {
       const template = templates.find((item) => item.id === nextTemplateId);
       if (!template) return;
 
@@ -175,7 +179,10 @@ export default function Page() {
         const response = await fetch("/api/scene", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ templateId: nextTemplateId }),
+          body: JSON.stringify({
+            templateId: nextTemplateId,
+            modelChoice: nextModelChoice,
+          }),
         });
 
         if (!response.ok) {
@@ -195,8 +202,10 @@ export default function Page() {
       return;
     }
 
-    loadSceneForTemplate(templateId).catch((error) => setErr(toErrorMessage(error)));
-  }, [loadSceneForTemplate, templateId, templates.length]);
+    loadSceneForTemplate(templateId, modelChoice).catch((error) =>
+      setErr(toErrorMessage(error))
+    );
+  }, [loadSceneForTemplate, modelChoice, templateId, templates.length]);
 
   function removeProduct(id: string) {
     setSelectedProducts((previous) => {
@@ -315,7 +324,7 @@ export default function Page() {
         throw new Error("Regenerering gjelder kun soft templates");
       }
 
-      await loadSceneForTemplate(templateId);
+      await loadSceneForTemplate(templateId, modelChoice);
     } catch (error) {
       setErr(toErrorMessage(error));
     }
@@ -337,6 +346,7 @@ export default function Page() {
 
       const formData = new FormData();
       formData.append("instruction", sceneFixPrompt.trim());
+      formData.append("modelChoice", modelChoice);
       formData.append(
         "scene",
         new File([sceneBlob], "scene.png", { type: sceneBlob.type || "image/png" })
@@ -393,6 +403,7 @@ export default function Page() {
       formData.append("placementPrompt", placementPrompt.trim());
       formData.append("variants", String(variants));
       formData.append("orderedRefs", JSON.stringify(orderedRefs));
+      formData.append("modelChoice", modelChoice);
       formData.append(
         "scene",
         new File([sceneBlob], "scene.png", { type: sceneBlob.type || "image/png" })
@@ -431,7 +442,7 @@ export default function Page() {
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <h1>Miljøbilde + produktplassering (uten mask/inpainting)</h1>
+      <h1>Miljøbilde + produktplassering</h1>
 
       <div
         style={{
@@ -448,7 +459,22 @@ export default function Page() {
             padding: 12,
           }}
         >
-          <h2 style={{ marginTop: 0 }}>1) Velg miljø</h2>
+          <h2 style={{ marginTop: 0 }}>1) Velg modell og miljø</h2>
+
+          <label style={{ display: "block", marginBottom: 10 }}>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>Modell</div>
+            <select
+              value={modelChoice}
+              onChange={(event) => setModelChoice(event.target.value as ImageModelChoice)}
+              style={{ width: "100%" }}
+            >
+              {IMAGE_MODEL_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
           <select
             value={templateId}
@@ -464,7 +490,6 @@ export default function Page() {
 
           <div style={{ marginTop: 12 }}>
             <div style={{ fontSize: 12, opacity: 0.8 }}>Miljøbilde</div>
-
             {busyScene ? (
               <div
                 style={{
